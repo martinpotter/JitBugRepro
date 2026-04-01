@@ -1,0 +1,38 @@
+name: Continuous Integration
+on:
+  workflow_dispatch:
+  push:
+defaults:
+  run:
+    shell: pwsh
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-15-intel, macos-latest]
+        dotnet-version: [9.0.x, 10.0.100-preview.7.25380.108, 10.0.x]
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+    - name: Write global.json
+      run: |
+        echo '
+        {
+          "sdk": {
+            "version": "${{ matrix.dotnet-version }}",
+            "rollForward": "${{ matrix.dotnet-version == '10.0.100-preview.7.25380.108' && 'disable' || 'latestFeature' }}"
+          }
+        }
+        ' > global.json
+      shell: bash      
+    - name: Install .NET
+      uses: actions/setup-dotnet@v5
+    - name: Run
+      run: dotnet run -p:BuildTargetFramework=${{ matrix.dotnet-version == '9.0.x' && 'net9.0' || 'net10.0' }} -c Release
